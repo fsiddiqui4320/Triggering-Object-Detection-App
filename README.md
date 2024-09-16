@@ -5,4 +5,4 @@ Group Name: TEAM_NAME
 
 Team Members: STUDENTS_NETIDS
 
-Project Manager: speru4
+Project Manager: PM_NETID
