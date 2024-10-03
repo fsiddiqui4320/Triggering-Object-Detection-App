@@ -3,6 +3,6 @@ Group Name: TEAM_NAME
 
 [MVP Link](https://docs.google.com/document/d/1xFI9DDdO5HZAcu36Y6NL-RTDry5E3WHkfy-ZEWuqbXM/edit?usp=sharing)
 
-Team Members: tian29, divvyam3, omara9
+Team Members: tian29, divvyam3
 
 Project Manager: PM_NETID
