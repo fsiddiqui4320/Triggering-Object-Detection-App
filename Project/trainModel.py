@@ -13,4 +13,3 @@ model = YOLO(model='yolov8n.pt')
 model.info()
 results = model.train(data="Project/Data/data.yaml", epochs=1, imgsz=640)
 
-results2 = model('Project/Data/test/0b891eae-ep261_jpg.rf.6f5015ea3da9a8ba995acda22945eb98.jpg')
