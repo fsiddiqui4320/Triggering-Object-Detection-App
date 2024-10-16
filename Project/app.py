@@ -1,6 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 import os
 from werkzeug.utils import secure_filename
+from ultralytics import YOLO  # Import YOLO from Ultralytics
+
+# Load the YOLOv8 model
+model = YOLO('/Users/farissiddiqui/Desktop/VS_Code/124_Honors/FA24-Group2/Project/Models/model1/weights/best.pt')
 
 app = Flask(__name__)
 
@@ -20,12 +24,12 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload_image():
     if 'image' not in request.files:
-        print("No image part in request")
+        print("No image part in the request")
         return redirect(request.url)
 
     file = request.files['image']
     
-    # Check if a file was actually selected
+    # Check if a file was selected
     if file.filename == '':
         print("No file selected")
         return redirect(request.url)
@@ -44,7 +48,30 @@ def upload_image():
             print(f"Error saving file: {e}")
             return redirect(request.url)
 
-        return redirect(url_for('display_image', filename=filename))
+        # --- YOLOv8 Inference ---
+        try:
+            print(f"Running YOLOv8 inference on: {filepath}")
+            results = model(filepath, conf=0.25)  # YOLOv8 inference
+            result = results[0]  # Access the first result
+
+            print(f"Detections: {len(result.boxes)}")
+
+            # Get the annotated image (bounding boxes, labels) from YOLOv8 as a NumPy array
+            annotated_image = result.plot()  # The 'plot()' function returns an image as a NumPy array
+
+            # Save the annotated image using OpenCV (OpenCV is required here)
+            import cv2
+            result_image_path = os.path.join(app.config['UPLOAD_FOLDER'], 'result.jpg')  # Define the path to save the image
+            cv2.imwrite(result_image_path, annotated_image)  # Save the result image
+
+            print(f"YOLOv8 inference completed, result saved at {result_image_path}")
+
+            # Redirect to display the processed (annotated) image
+            return redirect(url_for('display_image', filename='result.jpg'))
+        
+        except Exception as e:
+            print(f"Error running YOLOv8 inference: {e}")
+            return redirect(request.url)
 
     print("File extension not allowed")
     return redirect(request.url)
