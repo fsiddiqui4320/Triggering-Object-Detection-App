@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, send_from_
 import os
 from werkzeug.utils import secure_filename
 from ultralytics import YOLO  # Import YOLO from Ultralytics
+import cv2
 
 # Load the YOLOv8 model
 model = YOLO('/Users/farissiddiqui/Desktop/VS_Code/124_Honors/FA24-Group2/Project/Models/model1/weights/best.pt')
@@ -28,52 +29,43 @@ def upload_image():
         return redirect(request.url)
 
     file = request.files['image']
-    
-    # Check if a file was selected
+
     if file.filename == '':
         print("No file selected")
         return redirect(request.url)
 
-    # Validate the file type
     if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename).lower()  # Sanitize filename and convert to lowercase
+        filename = secure_filename(file.filename).lower()
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
 
-        # Save the file to the configured upload folder
-        try:
-            print(f"Saving file to: {filepath}")
-            file.save(filepath)
-            print(f"File saved successfully at {filepath}")
-        except Exception as e:
-            print(f"Error saving file: {e}")
-            return redirect(request.url)
+        print(f"Running YOLOv8 inference on: {filepath}")
+        results = model(filepath)  # YOLOv8 inference
+        result = results[0]
+        detections_count = len(result.boxes)  # Get number of detections
 
-        # --- YOLOv8 Inference ---
-        try:
-            print(f"Running YOLOv8 inference on: {filepath}")
-            results = model(filepath, conf=0.25)  # YOLOv8 inference
-            result = results[0]  # Access the first result
-
-            print(f"Detections: {len(result.boxes)}")
-
-            # Get the annotated image (bounding boxes, labels) from YOLOv8 as a NumPy array
-            annotated_image = result.plot()  # The 'plot()' function returns an image as a NumPy array
-
-            # Save the annotated image using OpenCV (OpenCV is required here)
-            import cv2
-            result_image_path = os.path.join(app.config['UPLOAD_FOLDER'], 'result.jpg')  # Define the path to save the image
-            cv2.imwrite(result_image_path, annotated_image)  # Save the result image
-
-            print(f"YOLOv8 inference completed, result saved at {result_image_path}")
-
-            # Redirect to display the processed (annotated) image
-            return redirect(url_for('display_image', filename='result.jpg'))
+        # Draw bounding boxes and save the image (as in previous steps)
+        if detections_count > 0:
+            temp_image = cv2.imread(filepath)
+            image = cv2.blur(temp_image, (30, 30)) 
+        else:
+            image = cv2.imread(filepath)
         
-        except Exception as e:
-            print(f"Error running YOLOv8 inference: {e}")
-            return redirect(request.url)
+        for box in result.boxes:
+            x1, y1, x2, y2 = box.xyxy[0]
+            conf = box.conf[0]
+            cls = int(box.cls[0])
+            label = result.names[cls]
+            cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+            text = f"{label}: {conf:.2f}"
+            cv2.putText(image, text, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-    print("File extension not allowed")
+        result_image_path = os.path.join(app.config['UPLOAD_FOLDER'], 'result_annotated.jpg')
+        cv2.imwrite(result_image_path, image)
+
+        # Pass the filename and detections_count to the template
+        return render_template('index.html', filename='result_annotated.jpg', detections_count=detections_count)
+
     return redirect(request.url)
 
 @app.route('/display/<filename>')
