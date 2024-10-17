@@ -5,13 +5,17 @@ from ultralytics import YOLO  # Import YOLO from Ultralytics
 import cv2
 
 # Load the YOLOv8 model
-model = YOLO('Models/model1/weights/best.pt')
+dir_path = os.path.dirname(os.path.realpath(__file__))
+
+model = YOLO(dir_path + '/Models/model1/weights/best.pt')
 
 app = Flask(__name__)
 
 # Define the upload folder path (use absolute path to avoid issues)
-app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'static/uploads/')
+app.config['UPLOAD_FOLDER'] = dir_path + '/static/uploads/'
 
+print("This is current directoy" + os.getcwd())
+print("This is file directoy" + dir_path)
 # Allowed file extensions (for security reasons)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
