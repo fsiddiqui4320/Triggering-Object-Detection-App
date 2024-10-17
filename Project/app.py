@@ -5,7 +5,7 @@ from ultralytics import YOLO  # Import YOLO from Ultralytics
 import cv2
 
 # Load the YOLOv8 model
-model = YOLO('/Users/farissiddiqui/Desktop/VS_Code/124_Honors/FA24-Group2/Project/Models/model1/weights/best.pt')
+model = YOLO('Models/model1/weights/best.pt')
 
 app = Flask(__name__)
 
