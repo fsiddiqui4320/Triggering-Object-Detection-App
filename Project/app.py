@@ -1,3 +1,7 @@
+import torch
+print(torch.cuda.is_available())
+
+
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 import os
 from werkzeug.utils import secure_filename
@@ -7,7 +11,7 @@ import cv2
 # Load the YOLOv8 model
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-model = YOLO(dir_path + '/Models/model1/weights/best.pt')
+model = YOLO(dir_path + '/Models/model1/weights/best.pt').to('cpu')
 
 app = Flask(__name__)
 
