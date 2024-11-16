@@ -14,11 +14,11 @@
     </form>
 
     <!-- Display the processed image if available -->
-    {% if filename %}
+    {% if result %}
     <div class="image-container">
         <h2>Processed Image:</h2>
-        <img src="{{ url_for('display_image', filename=filename) }}" alt="Processed Image">
-        <p>This image contained {{ detections_count }} triggering items</p>
+        <img src="data:image/jpeg;base64,{{ image_base64 }}" alt="Processed Image" />
+        <p>This image contained triggering items</p>
     </div>
     {% endif %}
 </body>
