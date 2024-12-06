@@ -1,25 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YOLOv8 Image Upload</title>
+    <title>YOLOv8 File Upload</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #141e30, #243b55);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+            padding: 30px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #4e94ff;
+        }
+
+        p {
+            font-size: 1rem;
+            color: #b0c4de;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 10px 20px;
+            font-size: 1rem;
+            color: #fff;
+            background: linear-gradient(135deg, #4e94ff, #1c77ff);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .file-label:hover {
+            background: linear-gradient(135deg, #1c77ff, #4e94ff);
+            transform: scale(1.05);
+        }
+
+        .file-chosen {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #b0c4de;
+        }
+
+        select, input[type="submit"] {
+            font-size: 1rem;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            outline: none;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        select {
+            background: rgba(0, 0, 0, 0.2);
+            color: #b0c4de;
+        }
+
+        input[type="submit"] {
+            background: linear-gradient(135deg, #4e94ff, #1c77ff);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s ease-in-out;
+            font-weight: bold;
+        }
+
+        input[type="submit"]:hover {
+            background: linear-gradient(135deg, #1c77ff, #4e94ff);
+            transform: scale(1.05);
+        }
+
+        .result-container {
+            margin-top: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 15px;
+        }
+
+        .result-container h2 {
+            font-size: 1.5rem;
+            color: #4e94ff;
+        }
+
+        .result-container img,
+        .result-container video {
+            margin-top: 15px;
+            border-radius: 10px;
+            max-width: 100%;
+        }
+
+        .result-container p {
+            margin-top: 10px;
+            font-size: 1rem;
+            color: #b0c4de;
+        }
+
+        .dropdown-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .dropdown-label {
+            font-size: 1rem;
+            color: #b0c4de;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-    <h1>Upload an Image to Check for Triggers</h1>
-    <form action="/upload" method="POST" enctype="multipart/form-data">
-        <input type="file" name="image" accept="image/*" required>
-        <input type="submit" value="Upload Image">
-    </form>
+    <div class="container">
+        <h1>Trigger Detector</h1>
+        <p>Upload an image or video file to check for triggers. Choose the type of trigger to scan for.</p>
+        
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+            <div class="dropdown-container">
+                <label class="dropdown-label" for="trigger-type">Select Trigger Type:</label>
+                <select name="trigger-type" id="trigger-type">
+                    <option value="weapons">Weapons</option>
+                    <option value="other">Other (Coming Soon)</option>
+                </select>
+            </div>
+            
+            <label for="file-upload" class="file-label">Choose File</label>
+            <input id="file-upload" class="file-input" type="file" name="file" accept="image/*,video/*" required>
+            <span id="file-chosen" class="file-chosen">No file chosen</span>
+            
+            <input type="submit" value="Upload File">
+        </form>
 
-    <!-- Display the processed image if available -->
-    {% if result %}
-    <div class="image-container">
-        <h2>Processed Image:</h2>
-        <img src="data:image/jpeg;base64,{{ image_base64 }}" alt="Processed Image" />
-        <p>This image contained triggering items</p>
+        {% if result %}
+        <div class="result-container">
+            {% if image_base64 %}
+            <h2>Processed Image</h2>
+            <img src="data:image/jpeg;base64,{{ image_base64 }}" alt="Processed Image">
+            <p>This image contained triggering items.</p>
+            {% elif video_path %}
+            <h2>Processed Video</h2>
+            <video controls>
+                <source src="{{ url_for('display_file', filename=video_path.split('/')[-1]) }}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            <p>This video contained triggering items.</p>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
+
+    <script>
+        const fileInput = document.getElementById('file-upload');
+        const fileChosen = document.getElementById('file-chosen');
+
+        fileInput.addEventListener('change', () => {
+            fileChosen.textContent = fileInput.files[0] ? fileInput.files[0].name : 'No file chosen';
+        });
+    </script>
 </body>
 </html>

@@ -1,9 +1,6 @@
 import base64
 import numpy as np
 import torch
-print(torch.cuda.is_available())
-
-
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 import os
 from werkzeug.utils import secure_filename
@@ -18,58 +15,70 @@ model = YOLO(dir_path + '/Models/model1/weights/best.pt').to('cpu')
 
 # Define the upload folder path (use absolute path to avoid issues)
 app.config['UPLOAD_FOLDER'] = dir_path + '/static/uploads/'
-#print("This is current directoy" + os.getcwd())
-#print("This is file directoy" + dir_path)
 
 # Allowed file extensions (for security reasons)
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS_IMAGE = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS_VIDEO = {'mp4', 'avi', 'mov', 'mkv'}
+ALLOWED_EXTENSIONS = ALLOWED_EXTENSIONS_IMAGE.union(ALLOWED_EXTENSIONS_VIDEO)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def processImage(image):
-    results = model(image)  # YOLOv8 inference
-    result = results[0]
-
-    # Draw bounding boxes and save the image (as in previous steps)
-    for box in result.boxes:
-        x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-        
-        conf = box.conf[0]
-        cls = int(box.cls[0])
-        label = result.names[cls]
-
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        text = f"{label}: {conf:.2f}"
-        cv2.putText(image, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-        roi = image[y1:y2, x1:x2]
-        blurred_roi = cv2.GaussianBlur(roi, (51, 51), 0)
-        image[y1:y2, x1:x2] = blurred_roi
-
-    return image
-
-def validateRequest(request):
-    if 'image' not in request.files:
-        print("No image part in the request")
-        return False
-    
-    file = request.files['image']
-
-    if not file:
-        print("No file selected")
+def process_video(video_path, output_path):
+    # Read the video
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"Error: Cannot open video file {video_path}")
         return False
 
-    filename = file.filename
+    # Get video properties
+    fps = cap.get(cv2.CAP_PROP_FPS)  # Get original FPS (e.g., 29.97)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fourcc = cv2.VideoWriter_fourcc(*'H264')  # Use H.264 codec
 
-    if filename == '':
-        print("No file selected")
+    # Initialize VideoWriter
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    if not out.isOpened():
+        print(f"Error: Cannot write to file {output_path}")
         return False
-    
-    if not ('.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS):
-        print("Invalid extension")
-        return False
-    
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Process frame (apply YOLO detections, etc.)
+        results = model(frame)
+        result = results[0]
+
+        for box in result.boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            conf = box.conf[0]
+            cls = int(box.cls[0])
+            label = result.names[cls]
+
+            # Draw bounding box
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+            # Add label and confidence score
+            text = f"{label}: {conf:.2f}"
+            cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            # Blur the detected region (optional, can be removed if not needed)
+            roi = frame[y1:y2, x1:x2]
+            blurred_roi = cv2.GaussianBlur(roi, (51, 51), 0)
+            frame[y1:y2, x1:x2] = blurred_roi
+
+            """ x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            roi = frame[y1:y2, x1:x2]
+            blurred_roi = cv2.GaussianBlur(roi, (51, 51), 0)ç
+            frame[y1:y2, x1:x2] = blurred_roi """
+
+        out.write(frame)
+
+    cap.release()
+    out.release()
     return True
 
 @app.route('/')
@@ -77,36 +86,35 @@ def index():
     return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
-def upload_image():
-    
-    result = validateRequest(request)
-    if not result:
+def upload_file():
+    if 'file' not in request.files:
         return redirect(request.url)
-
-    file = request.files['image']
     
-    img_stream = file.stream.read()
-    img_array = np.frombuffer(img_stream, np.uint8)
-    img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-
-#    cv2.imshow("Regular Image", img)
-#    cv2.waitKey(0)
-#    cv2.destroyAllWindows()
-
-    processedImage = processImage(img)  
-
-#    cv2.imshow("Blurred Detections", processedImage)
-#    cv2.waitKey(0)
-#    cv2.destroyAllWindows()
-
-    # Convert the image to base64 (useful for returning it in HTTP response)
-    _, buffer = cv2.imencode('.jpg', processedImage)
-    img_base64 = base64.b64encode(buffer).decode('utf-8') # IMPORT BASE64 FOR THIS TO WORK
-
-    return render_template('index.html', image_base64=img_base64, result = True)
+    file = request.files['file']
+    if file.filename == '' or not allowed_file(file.filename):
+        return redirect(request.url)
+    
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(file_path)
+    
+    # Determine if it's an image or a video
+    ext = filename.rsplit('.', 1)[1].lower()
+    if ext in ALLOWED_EXTENSIONS_IMAGE:
+        img_stream = file.stream.read()
+        img_array = np.frombuffer(img_stream, np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        processedImage = processImage(img)
+        _, buffer = cv2.imencode('.jpg', processedImage)
+        img_base64 = base64.b64encode(buffer).decode('utf-8')
+        return render_template('index.html', image_base64=img_base64, result=True)
+    elif ext in ALLOWED_EXTENSIONS_VIDEO:
+        output_video_path = os.path.join(app.config['UPLOAD_FOLDER'], f"processed_{filename}")
+        process_video(file_path, output_video_path)
+        return render_template('index.html', video_path=output_video_path, result=True)
 
 @app.route('/display/<filename>')
-def display_image(filename):
+def display_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
